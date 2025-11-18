@@ -77,16 +77,20 @@ class BigramLanguageModel(nn.Module):
         # each token directly reads off the logits for the next token from a lookup table
         self.token_embedding_table = nn.Embedding(vocab_size, vocab_size)
 
-    def forward(self, idx, targets):
+    def forward(self, idx, targets=None):
 
         # idx and targets are both (B,T) tensor of integers
         logits = self.token_embedding_table(idx)  # (B, T, C)
 
-        B, T, C = logits.shape
-        logits = logits.view(B*T, C)
-        targets = targets.view(B*T)
-
-        loss = F.cross_entropy(logits, targets)
+        if targets is None:
+            loss = None
+        else:
+        
+            B, T, C = logits.shape
+            logits = logits.view(B*T, C)
+            targets = targets.view(B*T)
+    
+            loss = F.cross_entropy(logits, targets)
 
         return logits, loss
 
@@ -98,14 +102,32 @@ class BigramLanguageModel(nn.Module):
             # foucs only on last time step
             logits = logits[:,-1,:] # become (B,C)
             # apply softmax to get prob 
-            probs = F.softmax(logits,dim=1) #(B,C)
+            probs = F.softmax(logits,dim=-1) #(B,C)
             #sample from the distribution
             idx_next = torch.multinomial(probs , num_samples = 1)
             # append sampled index to the running sequence
             idx = torch.cat((idx,idx_next),dim=1)
-            return idx
+        return idx
 
 m = BigramLanguageModel(vocab_size)
 logits , loss = m(xb,yb)
 print(logits.shape)
 print(loss)
+
+
+idx = torch.zeros((1,1),dtype=torch.long)
+print(decode(m.generate(idx = torch.zeros((1,1),dtype=torch.long), max_new_tokens=100)[0].tolist()))
+
+
+optimizer = torch.optim.AdamW(m.parameters(),lr=1e-3)
+
+batch_size = 32
+for steps in range(10000):
+    xb , yb = get_batch('train')
+
+    # evaluate the loss
+    logits , loss = m(xb , yb)
+    optimizer.zero_grad(set_to_none = True)
+    loss.backward()
+    optimizer.step()
+print(loss.item())
