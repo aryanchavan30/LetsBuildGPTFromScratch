@@ -5,9 +5,9 @@ from torch.nn import functional as F
 
 batch_size = 32
 block_size = 8
-max_iters = 3000
-eval_interval = 300
-learning_rate = 1e-2
+max_iters = 5000
+eval_interval = 500
+learning_rate = 1e-3
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 200
 n_embd = 32
@@ -76,6 +76,7 @@ class BigramLanguageModel(nn.Module):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.positonal_embedding_table = nn.Embedding(block_size, n_embd)
+        self.sa_head = Head(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
     def forward(self, idx, targets=None):
@@ -84,6 +85,7 @@ class BigramLanguageModel(nn.Module):
         token_emb = self.token_embedding_table(idx) # (B,T,C)
         pos_emb = self.positonal_embedding_table(torch.arange(T, device=device)) # (T,C)
         x = token_emb + pos_emb # (B,T,C)
+        x = self.sa_head(x) # apply one head of self-attention
         logits = self.lm_head(x) # (B,T,vocab_size)
         if targets is None:
             loss = None
@@ -97,7 +99,8 @@ class BigramLanguageModel(nn.Module):
 
     def generate(self, idx, max_new_tokens):
         for _ in range(max_new_tokens):
-            logits, loss = self(idx)
+            idx_cond = idx[:, -block_size:]
+            logits, loss = self(idx_cond)
             logits = logits[:, -1, :]
             probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
