@@ -180,5 +180,22 @@ for iter in range(max_iters):
     loss.backward()
     optimizer.step()
 
-context = torch.zeros((1, 1), dtype=torch.long, device=device)
-print(decode(model.generate(context, max_new_tokens=500)[0].tolist()))
+torch.save({
+      'model_state_dict': model.state_dict(),
+      'optimizer_state_dict': optimizer.state_dict(),
+      'train_loss': losses['train'],
+      'val_loss': losses['val'],
+      'iteration': max_iters,
+      'vocab_size': vocab_size,
+      'stoi': stoi,
+      'itos': itos,
+  }, 'gpt_model.pth')
+print("Model saved to gpt_model.pth")
+
+# context = torch.zeros((1, 1), dtype=torch.long, device=device)\
+  # Start with actual text prompt
+prompt = "Solar Industries"
+context = torch.tensor([encode(prompt)], dtype=torch.long, device=device)
+generated = model.generate(context, max_new_tokens=500)
+print(decode(generated[0].tolist()))
+# print(decode(model.generate(context, max_new_tokens=500)[0].tolist()))
